@@ -76,7 +76,7 @@ class Query:
 
 PE_TERMS = (
     "platform engineering", "internal developer portal",
-    "internal developer platform", "developer platform",
+    "internal developer platform", "internal development platform", "developer platform",
     "developer experience platform",
 )
 CONTEXT_TERMS = (
