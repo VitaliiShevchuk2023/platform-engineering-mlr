@@ -1,0 +1,34 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # мінімальна версія, заявлена в README
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Lint (pyflakes rules)
+        run: |
+          pip install ruff==0.8.4
+          ruff check --select F mlr_search.py
+
+      - name: Offline demo
+        run: |
+          python mlr_search.py demo --out /tmp/demo | tee /tmp/demo.log
+          grep -q '"after_dedup": 7' /tmp/demo.log
+          grep -q '"pe-in-title": 3' /tmp/demo.log
+
+      - name: Gray-literature register
+        run: python mlr_search.py gray
