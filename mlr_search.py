@@ -142,7 +142,11 @@ def norm_doi(d: str | None) -> str | None:
 
 @lru_cache(maxsize=None)
 def _pattern(term: str) -> re.Pattern:
-    return re.compile(r"\b" + re.escape(norm_text(term)) + r"\b")
+    t = norm_text(term)
+    if t.endswith("s") and not t.endswith("ss"):
+        t = t[:-1]  # "microservices" має збігатися і з "microservice"
+    # однина й множина: "platform team" = "platform teams"
+    return re.compile(r"\b" + re.escape(t) + r"(?:s|es)?\b")
 
 
 def matches(q: Query, text: str | None) -> bool:
