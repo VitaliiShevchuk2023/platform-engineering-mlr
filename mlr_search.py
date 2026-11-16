@@ -54,6 +54,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
+from datetime import date as _date
 from dataclasses import asdict, dataclass, field
 from difflib import SequenceMatcher
 from functools import lru_cache
@@ -63,8 +64,17 @@ from typing import Callable, Iterator
 # ─────────────────────────────── протокол ────────────────────────────────
 
 DATE_FROM = "2020-01-01"
-DATE_TO = "2026-02-28"
-YEAR_FROM, YEAR_TO = 2020, 2026
+# Верхня межа = дата офіційного пошуку (PROTOCOL.md).
+# Задається --date-to, за замовчуванням сьогодні;
+# фактичне значення пишеться в prisma_search.json.
+DATE_TO = _date.today().isoformat()
+YEAR_FROM, YEAR_TO = 2020, int(DATE_TO[:4])
+
+
+def set_date_to(d: str) -> None:
+    global DATE_TO, YEAR_TO
+    DATE_TO = _date.fromisoformat(d).isoformat()
+    YEAR_TO = int(DATE_TO[:4])
 
 
 @dataclass(frozen=True)
@@ -94,10 +104,11 @@ QUERIES: list[Query] = [
     Query("tools", (("Backstage", "Port", "Cortex", "Humanitec"), PE_CONTEXT)),
     Query("concepts", (("golden path", "service catalog", "developer self-service"),
                        PE_CONTEXT + ("DevOps",))),
-    # Фасет метрик без контекстної групи — саме так у статті. Він і є джерелом
-    # розмивання корпусу літературою про DevEx без PE.
+    # Відхилення від статті: там фасет метрик без контекстної групи,
+    # і в пробному прогоні він дав ~1800 записів про DevEx без PE.
     Query("metrics", (("DORA metrics", "SPACE framework",
-                       "developer experience measurement"),)),
+                       "developer experience measurement"),
+                      PE_CONTEXT)),
     Query("organizational", (("platform team", "Team Topologies",
                               "cognitive load reduction"),
                              ("software", "DevOps", "developer"))),
@@ -564,6 +575,8 @@ def final_decision(r: dict) -> str:
 def cmd_search(args) -> None:
     global USER_AGENT
     USER_AGENT = f"mlr-pe-search/1.0 (mailto:{args.mailto})"
+    if args.date_to:
+        set_date_to(args.date_to)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     dbs = args.dbs.split(",") if args.dbs else [d for d in ADAPTERS if d != "acm_via_crossref"]
@@ -673,6 +686,8 @@ def _openalex_get(path: str, mailto: str) -> dict:
 def cmd_snowball(args) -> None:
     global USER_AGENT
     USER_AGENT = f"mlr-pe-search/1.0 (mailto:{args.mailto})"
+    if args.date_to:
+        set_date_to(args.date_to)
     rows = read_csv(Path(args.screening))
     included = [r for r in rows if final_decision(r) == "INC" and (r["doi"] or r["openalex_id"])]
     if not included:
@@ -925,6 +940,8 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--mailto", required=True, help="e-mail для ввічливого доступу OpenAlex/Crossref")
     s.add_argument("--dbs", help=f"через кому, з: {','.join(ADAPTERS)}")
     s.add_argument("--cap", type=int, default=2000, help="максимум записів на (базу × запит)")
+    s.add_argument("--date-to",
+                   help="верхня межа дат РРРР-ММ-ДД (за замовч. сьогодні)")
     s.add_argument("--scholar-csv", help="CSV з Publish or Perish")
     s.set_defaults(func=cmd_search)
 
@@ -938,6 +955,7 @@ def main(argv: list[str] | None = None) -> None:
     b.add_argument("--mailto", required=True)
     b.add_argument("--seeds", type=int, default=10)
     b.add_argument("--forward-cap", type=int, default=500)
+    b.add_argument("--date-to", help="та сама дата, що й у пошуку")
     b.set_defaults(func=cmd_snowball)
 
     g = sub.add_parser("gray", help="3.2.2: реєстр сірої літератури і перевірка критеріїв")
