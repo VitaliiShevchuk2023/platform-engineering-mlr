@@ -240,11 +240,16 @@ def _from_openalex(w: dict, qname: str, origin: str = "database") -> Record:
     )
 
 
+def _oa_key() -> dict:
+    k = os.environ.get("OPENALEX_API_KEY")
+    return {"api_key": k} if k else {}
+
+
 def _openalex_pages(flt: str, mailto: str, cap: int) -> Iterator[dict]:
     cursor, n = "*", 0
     while cursor and n < cap:
         data = json.loads(http_get("https://api.openalex.org/works",
-                                   {"filter": flt, "per-page": 200, "cursor": cursor, "mailto": mailto}))
+                                   {"filter": flt, "per-page": 200, "cursor": cursor, "mailto": mailto, **_oa_key()}))
         results = data.get("results") or []
         if not results:
             break
@@ -658,7 +663,7 @@ def cmd_agreement(args) -> None:
 
 
 def _openalex_get(path: str, mailto: str) -> dict:
-    return json.loads(http_get(f"https://api.openalex.org/{path}", {"mailto": mailto}))
+    return json.loads(http_get(f"https://api.openalex.org/{path}", {"mailto": mailto, **_oa_key()}))
 
 
 def cmd_snowball(args) -> None:
