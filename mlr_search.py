@@ -196,7 +196,7 @@ USER_AGENT = "mlr-pe-search/1.0"
 def http_get(url: str, params: dict | None = None, headers: dict | None = None,
              retries: int = 4, pause: float = 1.5) -> str:
     if params:
-        url += ("&" if "?" in url else "?") + urllib.parse.urlencode(params, safe=":,|*()\"")
+        url += ("&" if "?" in url else "?") + urllib.parse.urlencode(params, safe=":,*")
     h = {"User-Agent": USER_AGENT, **(headers or {})}
     for attempt in range(retries):
         try:
@@ -296,7 +296,7 @@ def search_arxiv(q: Query, cap: int, **_) -> Iterator[Record]:
     start = 0
     while start < cap:
         root = ET.fromstring(http_get("https://export.arxiv.org/api/query",
-                                      {"search_query": sq, "start": start, "max_results": 100}))
+                                      {"search_query": sq, "start": start, "max_results": min(100, cap - start)}))
         entries = root.findall("a:entry", ns)
         if not entries:
             break
@@ -318,10 +318,11 @@ def search_crossref_acm(q: Query, cap: int, mailto: str, **_) -> Iterator[Record
     """Crossref не має булевої логіки: по фразі першої групи, далі локальний предикат.
     Ранжування в Crossref нечітке, тож cap обов'язковий — інакше він поверне все."""
     flt = f"from-pub-date:{DATE_FROM},until-pub-date:{DATE_TO},prefix:10.1145"
-    per_phrase = max(cap // len(q.groups[0]), 50)
+    per_phrase = max(cap // len(q.groups[0]), 1)
     for phrase in q.groups[0]:
-        cursor, n = "*", 0
-        while cursor and n < per_phrase:
+        cursor, n, pages = "*", 0, 0
+        while cursor and n < per_phrase and pages < 10:
+            pages += 1
             data = json.loads(http_get("https://api.crossref.org/works", {
                 "query.bibliographic": phrase, "filter": flt, "rows": 200, "cursor": cursor,
                 "mailto": mailto,
@@ -330,6 +331,9 @@ def search_crossref_acm(q: Query, cap: int, mailto: str, **_) -> Iterator[Record
             if not items:
                 break
             for it in items:
+                title0 = (it.get("title") or [""])[0]
+                if not _pattern(phrase).search(norm_text(title0)):
+                    continue  # без анотацій булевий рядок можна перевірити лише по назві
                 parts = ((it.get("issued") or {}).get("date-parts") or [[None]])[0]
                 yield Record(title=(it.get("title") or [""])[0], year=parts[0] if parts else None,
                              doi=norm_doi(it.get("DOI")),
@@ -553,7 +557,7 @@ def cmd_search(args) -> None:
     USER_AGENT = f"mlr-pe-search/1.0 (mailto:{args.mailto})"
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    dbs = args.dbs.split(",") if args.dbs else list(ADAPTERS)
+    dbs = args.dbs.split(",") if args.dbs else [d for d in ADAPTERS if d != "acm_via_crossref"]
     raw: list[Record] = []
     log: dict = {"protocol": {"date_from": DATE_FROM, "date_to": DATE_TO,
                               "queries": {q.name: render_boolean(q) for q in QUERIES}},
@@ -604,6 +608,7 @@ def finish_search(raw: list[Record], out: Path, log: dict) -> list[Candidate]:
         "identified_by_db": dict(Counter(r.source_db for r in raw)),
         "after_dedup": len(cands),
         "duplicates_removed": len(raw) - len(cands),
+        "acm_doi_10_1145": sum((c.doi or "").startswith("10.1145/") for c in cands),
         "auto_flags": dict(flags),
         "outside_date_window": sum(in_window(c) == "no" for c in cands),
         "note": "Скринінг за назвами виконує людина в screening.csv (pass1/pass2). "
