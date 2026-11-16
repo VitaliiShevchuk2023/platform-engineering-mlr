@@ -58,7 +58,7 @@ from dataclasses import asdict, dataclass, field
 from difflib import SequenceMatcher
 from functools import lru_cache
 from pathlib import Path
-from typing import Callable, Iterable, Iterator
+from typing import Callable, Iterator
 
 # ─────────────────────────────── протокол ────────────────────────────────
 
@@ -881,7 +881,7 @@ def cmd_demo(args) -> None:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     print("== search (синтетичні записи, без мережі) ==")
-    cands = finish_search(_demo_records(), out, {"protocol": "demo", "databases": {}})
+    finish_search(_demo_records(), out, {"protocol": "demo", "databases": {}})
 
     # імітація двох проходів скринінгу
     rows = read_csv(out / "screening.csv")
