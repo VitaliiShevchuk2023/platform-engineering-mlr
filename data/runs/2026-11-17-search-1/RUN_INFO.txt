@@ -1,0 +1,5 @@
+]633;E;echo "date_to: $D";b14a7273-12e4-49b8-8221-e31cda4612a6]633;Cdate_to: 2026-11-17
+script_commit: c0078875c15105392fc72df5dacbad59936107bb
+Python 3.14.2
+cap: 2000 (default)
+openalex_api_key: used

@@ -1,0 +1,119 @@
+{
+  "protocol": {
+    "date_from": "2020-01-01",
+    "date_to": "2026-11-17",
+    "queries": {
+      "primary": "(\"platform engineering\" OR \"internal developer portal\" OR \"internal developer platform\" OR \"internal development platform\" OR \"developer platform\" OR \"developer experience platform\") AND (\"software engineering\" OR \"DevOps\" OR \"cloud\" OR \"microservices\" OR \"kubernetes\" OR \"software development\" OR \"developer productivity\")",
+      "tools": "(\"Backstage\" OR \"Port\" OR \"Cortex\" OR \"Humanitec\") AND (\"platform engineering\" OR \"internal developer platform\" OR \"developer portal\" OR \"developer platform\")",
+      "concepts": "(\"golden path\" OR \"service catalog\" OR \"developer self-service\") AND (\"platform engineering\" OR \"internal developer platform\" OR \"developer portal\" OR \"developer platform\" OR \"DevOps\")",
+      "metrics": "(\"DORA metrics\" OR \"SPACE framework\" OR \"developer experience measurement\") AND (\"platform engineering\" OR \"internal developer platform\" OR \"developer portal\" OR \"developer platform\")",
+      "organizational": "(\"platform team\" OR \"Team Topologies\" OR \"cognitive load reduction\") AND (\"software\" OR \"DevOps\" OR \"developer\")"
+    }
+  },
+  "databases": {
+    "openalex": {
+      "status": "ok",
+      "per_query": {
+        "primary": {
+          "returned": 334,
+          "no_abstract": 21,
+          "fails_local_predicate": 20
+        },
+        "tools": {
+          "returned": 16,
+          "no_abstract": 1,
+          "fails_local_predicate": 3
+        },
+        "concepts": {
+          "returned": 32,
+          "no_abstract": 4,
+          "fails_local_predicate": 1
+        },
+        "metrics": {
+          "returned": 7,
+          "no_abstract": 1
+        },
+        "organizational": {
+          "returned": 94,
+          "fails_local_predicate": 11,
+          "no_abstract": 14
+        }
+      }
+    },
+    "semantic_scholar": {
+      "status": "ok",
+      "per_query": {
+        "primary": {
+          "returned": 139,
+          "no_abstract": 9,
+          "fails_local_predicate": 8
+        },
+        "tools": {
+          "returned": 4,
+          "fails_local_predicate": 1
+        },
+        "concepts": {
+          "returned": 13,
+          "fails_local_predicate": 1,
+          "no_abstract": 1
+        },
+        "metrics": {
+          "returned": 4
+        },
+        "organizational": {
+          "returned": 39,
+          "no_abstract": 3,
+          "fails_local_predicate": 7
+        }
+      }
+    },
+    "arxiv": {
+      "status": "ok",
+      "per_query": {
+        "primary": {
+          "returned": 75,
+          "fails_local_predicate": 72
+        },
+        "tools": {
+          "returned": 1,
+          "fails_local_predicate": 1
+        },
+        "concepts": {},
+        "metrics": {},
+        "organizational": {
+          "returned": 5,
+          "fails_local_predicate": 3
+        }
+      }
+    },
+    "ieee_xplore": {
+      "status": "skipped: IEEE_API_KEY not set"
+    },
+    "springer_link": {
+      "status": "skipped: SPRINGER_API_KEY not set"
+    },
+    "sciencedirect": {
+      "status": "skipped: ELSEVIER_API_KEY not set"
+    }
+  },
+  "flow": {
+    "identified_raw": 763,
+    "identified_by_db": {
+      "openalex": 483,
+      "semantic_scholar": 199,
+      "arxiv": 81
+    },
+    "after_dedup": 476,
+    "duplicates_removed": 287,
+    "acm_doi_10_1145": 7,
+    "auto_flags": {
+      "pe-in-title": 145,
+      "primary-match": 143,
+      "no-match": 106,
+      "no-match-title-only": 15,
+      "facet-match": 67
+    },
+    "outside_date_window": 0,
+    "note": "Скринінг за назвами виконує людина в screening.csv (pass1/pass2). Коди: INC, OUT (нерелевантно за назвою), EC1–EC5."
+  }
+}
