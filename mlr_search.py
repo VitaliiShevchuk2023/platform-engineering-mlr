@@ -539,7 +539,7 @@ def in_window(c: Candidate) -> str:
     return "yes" if YEAR_FROM <= c.year <= YEAR_TO else "no"
 
 
-DECISIONS = {"INC", "OUT", "EC1", "EC2", "EC3", "EC4", "EC5"}
+DECISIONS = {"INC", "OUT", "EC1", "EC2", "EC3", "EC4", "EC5", "EC6"}
 SCREEN_FIELDS = ["id", "title", "year", "in_window", "doi", "venue", "citations", "source_dbs",
                  "queries", "origin", "auto_flag", "pass1", "pass1_date", "pass2", "pass2_date",
                  "notes", "openalex_id", "abstract"]
@@ -634,7 +634,7 @@ def finish_search(raw: list[Record], out: Path, log: dict) -> list[Candidate]:
         "auto_flags": dict(flags),
         "outside_date_window": sum(in_window(c) == "no" for c in cands),
         "note": "Скринінг за назвами виконує людина в screening.csv (pass1/pass2). "
-                "Коди: INC, OUT (нерелевантно за назвою), EC1–EC5.",
+                "Коди: INC, OUT (нерелевантно за назвою), EC1–EC6.",
     }
     (out / "prisma_search.json").write_text(json.dumps(log, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(log["flow"], ensure_ascii=False, indent=2))
@@ -667,7 +667,7 @@ def cmd_agreement(args) -> None:
     substantive = [d for d in dis if (d[1] == "INC") != (d[2] == "INC")]
 
     print(f"Рядків з обома проходами: {len(both)}")
-    print(f"За кодами (INC/OUT/EC1–5):  збіг {po:.1%}, kappa = {k:.3f}")
+    print(f"За кодами (INC/OUT/EC1–6):  збіг {po:.1%}, kappa = {k:.3f}")
     print(f"Бінарно (включити/ні):      збіг {bpo:.1%}, kappa = {bk:.3f}")
     print(f"Розбіжностей: {len(dis)}, із них змінюють рішення про включення: {len(substantive)}")
     for d in dis:
@@ -803,7 +803,7 @@ def check_gray(g: GraySource) -> list[str]:
     if g.sample_unit not in ("persons", "none", "committee"):
         issues.append(f"одиниця вибірки '{g.sample_unit}' — не порівнювана з людьми")
     if g.kind == "book":
-        issues.append("книга: за Garousi et al. навряд чи сіра література")
+        issues.append("книга: сіра література 1-го рівня за Garousi et al., оцінка AACODS")
     if g.vendor:
         issues.append("вендор: Objectivity має відображати комерційний інтерес")
     if not g.in_reference_list:
