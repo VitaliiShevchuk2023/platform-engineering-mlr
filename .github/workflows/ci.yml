@@ -29,6 +29,7 @@ jobs:
           python mlr_search.py demo --out /tmp/demo | tee /tmp/demo.log
           grep -q '"after_dedup": 7' /tmp/demo.log
           grep -q '"pe-in-title": 3' /tmp/demo.log
+          grep -q 'merge: OK' /tmp/demo.log
 
       - name: Gray-literature register
         run: python mlr_search.py gray

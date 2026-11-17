@@ -921,12 +921,119 @@ def cmd_demo(args) -> None:
         w.writeheader()
         w.writerows(rows)
 
+    # merge: decisions written to separate pass files must come back unchanged
+    for k in ("pass1", "pass2"):
+        with (out / f"{k}.csv").open("w", encoding="utf-8", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(PASS_FIELDS)
+            w.writerows([r["id"], r[k], r[f"{k}_date"], ""] for r in rows)
+    cmd_merge(argparse.Namespace(
+        candidates=str(out / "screening.csv"), pass1=str(out / "pass1.csv"),
+        pass2=str(out / "pass2.csv"), out=str(out / "merged.csv"),
+        min_gap_days=14, allow_incomplete=False))
+    merged = {r["id"]: (r["pass1"], r["pass2"]) for r in read_csv(out / "merged.csv")}
+    assert merged == {r["id"]: (r["pass1"], r["pass2"]) for r in rows}, "merge змінив рішення"
+    print("merge: OK")
+
     print("\n== agreement ==")
     cmd_agreement(argparse.Namespace(screening=str(out / "screening.csv")))
     print("\n== report ==")
     cmd_report(argparse.Namespace(screening=str(out / "screening.csv"), snowball=None))
     print("\n== gray (3.2.2) ==")
     cmd_gray()
+
+
+# ───────────────────── screening in separate pass files ───────────────────
+# Each pass lives in its own file and its own branch. The second pass starts
+# from a branch created before the first pass was merged, so the first pass's
+# decisions are not on disk. merge combines both files only after both are done.
+
+PASS_FIELDS = ["id", "decision", "date", "notes"]
+PASS_TEMPLATE_FIELDS = PASS_FIELDS + ["auto_flag", "year", "venue", "title", "abstract"]
+
+
+def cmd_pass_template(args) -> None:
+    """Empty pass file: decision columns plus what the reviewer needs to see."""
+    rows = read_csv(Path(args.candidates))
+    out = Path(args.out)
+    if out.exists() and not args.force:
+        sys.exit(f"{out} уже існує; --force, щоб перезаписати")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=PASS_TEMPLATE_FIELDS, extrasaction="ignore")
+        w.writeheader()
+        for r in rows:
+            w.writerow({**r, "decision": "", "date": "", "notes": ""})
+    print(f"{out}: {len(rows)} кандидатів; колонки decision, date, notes порожні")
+
+
+def _read_pass(path: Path, ids: set[str], errors: list[str]) -> dict[str, dict]:
+    """Decisions of one pass; rows with an empty decision are not yet screened."""
+    found: dict[str, dict] = {}
+    with path.open(encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        lacking = set(PASS_FIELDS) - set(reader.fieldnames or [])
+        if lacking:
+            errors.append(f"{path.name}: немає колонок {sorted(lacking)}")
+            return found
+        for n, r in enumerate(reader, start=1):
+            rid = (r["id"] or "").strip()
+            dec = (r["decision"] or "").strip().upper()
+            if not dec:
+                continue
+            where = f"{path.name}, запис {n} ({rid})"
+            if rid not in ids:
+                errors.append(f"{where}: такого id немає серед кандидатів")
+            elif rid in found:
+                errors.append(f"{where}: повторне рішення для того самого id")
+            elif dec not in DECISIONS:
+                errors.append(f"{where}: невідомий код '{dec}'")
+            else:
+                try:
+                    d = _date.fromisoformat((r["date"] or "").strip())
+                except ValueError:
+                    errors.append(f"{where}: дата '{r['date']}' не у форматі РРРР-ММ-ДД")
+                    continue
+                found[rid] = {"decision": dec, "date": d, "notes": (r["notes"] or "").strip()}
+    return found
+
+
+def cmd_merge(args) -> None:
+    """Combine two pass files into screening.csv for agreement and report."""
+    cands = read_csv(Path(args.candidates))
+    ids = {r["id"] for r in cands}
+    errors: list[str] = []
+    p1 = _read_pass(Path(args.pass1), ids, errors)
+    p2 = _read_pass(Path(args.pass2), ids, errors)
+    if p1 and p2:
+        # the second pass must start after the first one is finished
+        gap = (min(v["date"] for v in p2.values()) - max(v["date"] for v in p1.values())).days
+        if gap < args.min_gap_days:
+            errors.append(f"другий прохід почато через {gap} дн. після завершення першого; "
+                          f"протокол вимагає щонайменше {args.min_gap_days}")
+    miss1, miss2 = ids - p1.keys(), ids - p2.keys()
+    if (miss1 or miss2) and not args.allow_incomplete:
+        errors.append(f"без рішення: pass1 — {len(miss1)}, pass2 — {len(miss2)} "
+                      "(--allow-incomplete, щоб звести частково)")
+    if errors:
+        sys.exit("merge відхилено:\n  " + "\n  ".join(errors))
+
+    for r in cands:
+        a, b = p1.get(r["id"]), p2.get(r["id"])
+        r["pass1"], r["pass1_date"] = (a["decision"], a["date"].isoformat()) if a else ("", "")
+        r["pass2"], r["pass2_date"] = (b["decision"], b["date"].isoformat()) if b else ("", "")
+        notes = [f"p1: {a['notes']}" if a and a["notes"] else "",
+                 f"p2: {b['notes']}" if b and b["notes"] else ""]
+        r["notes"] = "; ".join(x for x in notes if x)
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=SCREEN_FIELDS, extrasaction="ignore")
+        w.writeheader()
+        w.writerows(cands)
+    print(f"{out}: {len(cands)} кандидатів; рішень у pass1 — {len(p1)}, у pass2 — {len(p2)}")
+    if miss1 or miss2:
+        print(f"Увага: зведено частково (без рішення: pass1 — {len(miss1)}, pass2 — {len(miss2)})")
 
 
 # ─────────────────────────────────── CLI ─────────────────────────────────
@@ -948,6 +1055,21 @@ def main(argv: list[str] | None = None) -> None:
     a = sub.add_parser("agreement", help="Cohen's kappa між pass1 і pass2")
     a.add_argument("--screening", required=True)
     a.set_defaults(func=cmd_agreement)
+
+    t = sub.add_parser("pass-template", help="порожній файл одного проходу скринінгу")
+    t.add_argument("--candidates", required=True)
+    t.add_argument("--out", required=True)
+    t.add_argument("--force", action="store_true")
+    t.set_defaults(func=cmd_pass_template)
+
+    m = sub.add_parser("merge", help="звести pass1.csv і pass2.csv для agreement і report")
+    m.add_argument("--candidates", required=True)
+    m.add_argument("--pass1", required=True)
+    m.add_argument("--pass2", required=True)
+    m.add_argument("--out", required=True)
+    m.add_argument("--min-gap-days", type=int, default=14)
+    m.add_argument("--allow-incomplete", action="store_true")
+    m.set_defaults(func=cmd_merge)
 
     b = sub.add_parser("snowball", help="3.2.1: прямий/зворотний сніговий ком через OpenAlex")
     b.add_argument("--screening", required=True)
